@@ -84,6 +84,41 @@ gst-inspect-1.0 ccextractor | head -5
 
 ---
 
+## Step 3b — Patch GStreamer DeckLink Plugin (CEA-708 CC fix)
+
+`decklinkvideosink` in GStreamer 1.28.x has a bug in `write_vbi` that rejects CEA-708 `cc_data`
+buffers larger than 46 bytes. ATSC A/53 requires 60 bytes per frame at 29.97 fps, so CC is
+silently dropped on all standard broadcast content. Run this patch **once** after installing or
+upgrading GStreamer:
+
+```bash
+python3 patch-decklink.py
+```
+
+The script (in the repo root) copies the dylib to `plugins/`, raises the limit from 46 to 127
+bytes, and re-signs it with an ad-hoc signature. Then set `GST_PLUGIN_PATH` so GStreamer loads
+the patched copy:
+
+```bash
+# Add to ~/.zprofile (or ~/.zshrc) so it persists across shells:
+export GST_PLUGIN_PATH="$HOME/gst-decklink-ndi/plugins"
+```
+
+**Verify the patch applied:**
+```bash
+GST_PLUGIN_PATH=~/gst-decklink-ndi/plugins gst-inspect-1.0 decklinkvideosink | grep cc-line
+# Expected: cc-line  ...  Integer. Range: 0 - 22  Default: 0
+```
+
+**Re-run after `brew upgrade gstreamer`.** The patch script detects the installed version
+automatically. If offsets change in a future release, verify with:
+```bash
+otool -arch arm64 -tV /opt/homebrew/Cellar/gstreamer/$(brew list --versions gstreamer | awk '{print $2}')/lib/gstreamer-1.0/libgstdecklink.dylib \
+  | grep -B2 -A2 "cmp.*#0x2f"
+```
+
+---
+
 ## Step 4 — NDI SDK for Apple
 
 1. Go to: **https://ndi.video/for-developers/ndi-sdk/**
@@ -279,19 +314,27 @@ sudo make uninstall
 
 ## Playing a File to DeckLink Output
 
-To play a local MPEG-TS file (e.g. 1080i 29.97 H.264 + AC-3) to a DeckLink output device:
+To play a local MPEG-TS file (e.g. 1080i 29.97 H.264 + AC-3) to a DeckLink output device
+with video, audio, and CEA-608/708 closed captions:
 
 ```bash
+GST_PLUGIN_PATH=~/gst-decklink-ndi/plugins \
 gst-launch-1.0 -e \
   filesrc location="/path/to/file.ts" \
   ! tsdemux name=d \
   d. ! queue ! h264parse ! avdec_h264 ! videoconvert \
       ! video/x-raw,format=UYVY \
-      ! decklinkvideosink device-number=0 mode=1080i5994 \
+      ! decklinkvideosink device-number=0 mode=1080i5994 cc-line=9 \
   d. ! queue ! ac3parse ! avdec_ac3 ! audioconvert \
       ! audio/x-raw,format=S16LE,rate=48000,channels=2 \
       ! decklinkaudiosink device-number=0
 ```
+
+> **CC notes:**
+> - `GST_PLUGIN_PATH` loads the patched DeckLink plugin (Step 3b). Omit if CC is not needed.
+> - `cc-line=9` inserts CEA-608/708 as VANC on line 9 (SMPTE 334M standard for 1080i). Default is `0` (disabled).
+> - `avdec_h264` extracts CC from H.264 SEI at the correct display PTS. Do **not** use `ccextractor + cccombiner` for H.264 sources with B-frames — it causes CC/frame misalignment.
+> - Without `GST_PLUGIN_PATH` set, `decklinkvideosink` silently drops all CC data (`"Too big raw CEA708 buffer"`).
 
 Adjust `mode=` to match your content:
 

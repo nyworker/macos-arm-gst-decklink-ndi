@@ -4,3 +4,5 @@
 *.d
 Package.resolved
 .claude/
+plugins/libgstdecklink.dylib
+plugins/
