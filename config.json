@@ -1,0 +1,15 @@
+{
+  "device_number": 0,
+  "video_mode": "auto",
+  "audio_channels": 2,
+  "ndi_name": "DeckLink NDI",
+  "enable_audio": true,
+  "enable_cc": true,
+  "enable_scte35": false,
+  "queue_max_buffers": 2,
+  "queue_leaky": "downstream",
+  "restart_delay_seconds": 2.0,
+  "max_restart_attempts": 0,
+  "gst_launch_path": "/opt/homebrew/bin/gst-launch-1.0",
+  "log_level": "info"
+}
