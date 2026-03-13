@@ -1,7 +1,7 @@
 # macos-arm-gst-decklink-ndi
 
 macOS ARM Swift CLI that captures DeckLink video + audio and streams it as NDI using GStreamer.
-
+### Playing video/audio/cc1 SDI works
 > Companion to [gst-decklink-ndi](https://github.com/nyworker/gst-decklink-ndi) (Linux). Same concept, native macOS implementation.
 
 ---
